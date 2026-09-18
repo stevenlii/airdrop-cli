@@ -1,61 +1,93 @@
 # airdrop-cli
 
-在终端里用一行命令唤起 macOS AirDrop 发送文件：
+Launch macOS AirDrop from the terminal with a single command and send files:
 
 ```bash
-airdrop 文件1 [文件2 ...]
+airdrop file1 [file2 ...]
 ```
 
-`airdrop` 是一个自包含的小工具：它编译出一个极简的 `NSApplication`（`AirDropHelper.app`），
-通过 `NSSharingService(.sendViaAirDrop)` 托管 AirDrop 共享面板；命令行包装脚本负责校验文件并拉起它。
+`airdrop` is a small, self-contained tool. It compiles a minimal `NSApplication`
+(`AirDropHelper.app`) that hosts the AirDrop share sheet via
+`NSSharingService(.sendViaAirDrop)`. A thin shell wrapper validates the files you
+pass and launches the helper.
 
-## 安装
+> **macOS only.** This tool uses Apple's `AppKit` / `NSSharingService` frameworks
+> and the AirDrop share sheet, so it only works on macOS.
+
+## Requirements / tested environment
+
+Built and verified on:
+
+| Component | Version |
+|-----------|---------|
+| macOS | 14.7.2 (Build 23H311) |
+| Architecture | x86_64 |
+| Swift (`swiftc`) | Apple Swift 6.0.3 (swiftlang-6.0.3.1.10, clang-1600.0.30.1) |
+| xcode-select | 2408 |
+| Command Line Tools (CLT) | 16.2.0.0.1.1733547573 |
+| Available SDKs | MacOSX13 … MacOSX15.2 |
+
+It needs the Command Line Tools (for `swiftc`). No Xcode app install required.
+
+## Install
 
 ```bash
-# 1. 装编译工具（新电脑一般没有）
+# 1. Install the compiler (a fresh Mac usually doesn't have it)
 xcode-select --install
 
-# 2. 跑构建脚本（位置无所谓，直接 bash 路径就行，无需 sudo）
+# 2. Run the build script (no sudo needed; just point bash at the file)
 bash /path/to/build-airdrop.sh
 ```
 
-跑完即可在任意目录使用 `airdrop`。
+After it finishes, `airdrop` is available from any directory.
 
-## 用法
+## Usage
 
 ```bash
-airdrop 文件1 文件2        # 弹出 AirDrop 面板发送多个文件
-airdrop -n 文件1          # 只打印将执行的命令，不弹面板（dry-run）
+airdrop file1 file2        # open the AirDrop sheet and send multiple files
+airdrop -n file1           # print the command it would run, without opening the sheet (dry-run)
 ```
 
-生成的东西（均在用户目录 / 用户可写位置，不碰系统目录、不需要 sudo）：
+What gets created (all in your home directory or user-writable locations —
+no system directories touched, no sudo):
 
-| 文件 | 路径 | 作用 |
-|------|------|------|
-| Swift 助手 app | `~/airdrop_build/AirDropHelper.app` | 实际托管 AirDrop 传输 |
-| 命令 | `/usr/local/bin/airdrop` | `airdrop` 命令本体 |
+| Artifact | Path | Purpose |
+|----------|------|---------|
+| Swift helper app | `~/airdrop_build/AirDropHelper.app` | actually hosts the AirDrop transfer |
+| Command | `/usr/local/bin/airdrop` | the `airdrop` command itself |
 
-## 已知坑：Command Line Tools 16.2 自带缺陷
+## Known issue: Command Line Tools 16.2 is broken
 
-新版 macOS 自带的 CLT 16.2 包存在固有缺陷，会导致 swift 编译直接报错、且重装 CLT 也修不好：
+The CLT 16.2 package shipped with newer macOS has an intrinsic defect that makes
+`swiftc` fail to compile, and **reinstalling CLT does not fix it**:
 
-1. 编译器版本与 SDK 构建版本错配
+1. Compiler version vs. SDK build version mismatch
    `error: failed to build module 'CoreFoundation'; this SDK is not supported by the compiler`
-2. `usr/include/swift/module.modulemap` 与 `bridging.modulemap` 重复定义 `SwiftBridging`
+2. `usr/include/swift/module.modulemap` and `bridging.modulemap` both define `SwiftBridging`
    `error: redefinition of module 'SwiftBridging'`
 
-本脚本已自动处理：先试系统 `swiftc`；若失败，自动把 toolchain + SDK 拷贝到家目录
-（`~/clt_patched`、`~/macosx_patched.sdk`），就地把 SDK 记录的编译器版本号对齐到当前 swiftc、
-并去掉重复模块定义，再用补丁版 toolchain 编译。全程不需要 sudo，也不改动 `/Library` 下的系统文件。
+This script handles it automatically: it first tries the system `swiftc`; if that
+fails, it copies the toolchain + SDK into your home directory
+(`~/clt_patched`, `~/macosx_patched.sdk`), rewrites the SDK's recorded compiler
+version to match the current `swiftc`, removes the duplicate module definition,
+and compiles with the patched toolchain. No sudo, and no changes to the
+`/Library` system files.
 
-> 如果你手动重装过 CLT 仍报错，属于上述 16.2 包本身的缺陷，不要反复重装 —— 直接跑本脚本即可。
+> If you've manually reinstalled CLT and it still errors, that's the 16.2 package
+> defect itself — don't keep reinstalling. Just run this script.
 
-## 清理（可选）
+## Cleanup (optional)
 
-家目录补丁分支只用一次编译，app 运行时不依赖它们。要释放空间可删：
+The home-directory patched copies are only used during one build; the compiled
+app does not depend on them at runtime. To reclaim space:
 
 ```bash
 rm -rf ~/clt_patched ~/macosx_patched.sdk
 ```
 
-之后若换了 macOS 大版本需要重编译，再跑一次 `bash build-airdrop.sh` 会自动重新生成。
+If you later upgrade macOS across a major version and need to recompile, just run
+`bash build-airdrop.sh` again — it will regenerate them automatically.
+
+## License
+
+Released under the [MIT License](LICENSE).
