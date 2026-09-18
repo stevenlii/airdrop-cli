@@ -1,0 +1,11 @@
+# Build artifacts produced by build-airdrop.sh
+AirDropHelper.app/
+airdrop_build/
+*.app/
+
+# Patched toolchain / SDK copies created during a CLT 16.2 workaround
+clt_patched/
+macosx_patched.sdk/
+
+# macOS metadata
+.DS_Store
